@@ -1,0 +1,460 @@
+--- "/mnt/data/Pasted text(36).txt"	2026-04-26 16:18:45.914472327 +0000
++++ /mnt/data/main_v0_4_advanced.py	2026-04-26 16:21:08.487720084 +0000
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env python3
+ """
+-main.py — WiFi-DensePose fork advanced CSI anomaly head, v0.3
++main.py — WiFi-DensePose fork advanced CSI anomaly head, v0.4
+ 
+ Purpose:
+     Offline / replay-mode research detector for a "barrel-like long conductive-object
+@@ -34,6 +34,7 @@
+ 
+ import argparse
+ import csv
++import hashlib
+ import json
+ import math
+ import sys
+@@ -50,7 +51,7 @@
+     "not weapon confirmation and not intent detection."
+ )
+ 
+-VERSION = "0.3.0"
++VERSION = "0.4.0"
+ 
+ 
+ # ---------------------------------------------------------------------------
+@@ -335,7 +336,7 @@
+         raise CSIInputError(f"CSI file not found: {path}")
+ 
+     try:
+-        payload = np.load(path, allow_pickle=True)
++        payload = np.load(path, allow_pickle=False)
+     except Exception as exc:
+         raise CSIInputError(f"Could not read {path}: {exc}") from exc
+ 
+@@ -1040,7 +1041,156 @@
+     return "log_only"
+ 
+ 
++SAFETY_LIMITATIONS: List[str] = [
++    "Research/replay-mode anomaly scoring only; not weapon, rifle, identity, or intent detection.",
++    "Do not use as the sole basis for enforcement, search, detention, or other adverse action.",
++    "Requires local calibration with representative safe bags, device placement, venue layout, and RF environment.",
++    "Scores can shift with multipath, wet objects, dense electronics, body motion, antenna placement, and firmware changes.",
++]
++
++
++def validate_config(cfg: DetectionConfig) -> None:
++    checks = {
++        "threshold": cfg.threshold,
++        "quality_threshold": cfg.quality_threshold,
++        "restricted_zone_prior": cfg.restricted_zone_prior,
++        "bag_transition_prior": cfg.bag_transition_prior,
++    }
++    for name, value in checks.items():
++        if not 0.0 <= float(value) <= 1.0:
++            raise CSIInputError(f"{name} must be in [0, 1]. Got {value!r}.")
++    if int(cfg.min_frames) < 2:
++        raise CSIInputError(f"min_frames must be at least 2. Got {cfg.min_frames!r}.")
++    if float(cfg.carrier_hz) <= 0 or float(cfg.bandwidth_hz) <= 0:
++        raise CSIInputError("carrier_hz and bandwidth_hz must be positive.")
++    if float(cfg.sample_rate_hz) <= 0:
++        raise CSIInputError("sample_rate_hz must be positive.")
++    if float(cfg.link_distance_m) <= 0:
++        raise CSIInputError("link_distance_m must be positive.")
++
++
++def decision_policy(score: float, quality: float, threshold: float, quality_threshold: float) -> str:
++    if quality < quality_threshold:
++        return "rescan_low_quality"
++    if score >= threshold:
++        return "human_review_anomaly"
++    if score >= max(0.65, 0.75 * threshold):
++        return "secondary_review_optional"
++    return "log_only"
++
++
++def top_contributions(contributions: Dict[str, float], k: int = 12) -> List[Dict[str, float]]:
++    ranked = sorted(contributions.items(), key=lambda kv: abs(float(kv[1])), reverse=True)
++    return [{"name": str(name), "value": float(value)} for name, value in ranked[:k]]
++
++
++def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
++    h = hashlib.sha256()
++    with Path(path).open("rb") as fh:
++        while True:
++            chunk = fh.read(chunk_size)
++            if not chunk:
++                break
++            h.update(chunk)
++    return h.hexdigest()
++
++
++def annotate_result(result: DetectionResult, cfg: DetectionConfig, audit: Optional[Dict[str, Any]] = None) -> DetectionResult:
++    result.model["schema_version"] = "0.4"
++    result.model["decision"] = decision_policy(result.score, result.features.get("sensor_quality", 0.0), cfg.threshold, cfg.quality_threshold)
++    result.model["limitations"] = SAFETY_LIMITATIONS
++    result.model["top_contributions"] = top_contributions(result.contributions)
++    result.model["config"] = {
++        "threshold": float(cfg.threshold),
++        "quality_threshold": float(cfg.quality_threshold),
++        "min_frames": int(cfg.min_frames),
++        "carrier_hz": float(cfg.carrier_hz),
++        "bandwidth_hz": float(cfg.bandwidth_hz),
++        "link_distance_m": float(cfg.link_distance_m),
++        "sample_rate_hz": float(cfg.sample_rate_hz),
++        "restricted_zone_prior": float(cfg.restricted_zone_prior),
++        "bag_transition_prior": float(cfg.bag_transition_prior),
++    }
++    if audit:
++        result.model["audit"] = audit
++    return result
++
++
++def config_from_json(path: Path, base: Optional[DetectionConfig] = None) -> DetectionConfig:
++    cfg = base or DetectionConfig()
++    payload = json.loads(Path(path).read_text(encoding="utf-8"))
++    if not isinstance(payload, dict):
++        raise CSIInputError("Config JSON must contain an object.")
++    allowed = set(DetectionConfig.__dataclass_fields__.keys())
++    data = asdict(cfg)
++    for key, value in payload.items():
++        if key in allowed:
++            data[key] = value
++    out = DetectionConfig(**data)
++    validate_config(out)
++    return out
++
++
++def write_config_json(path: Path, cfg: DetectionConfig) -> None:
++    validate_config(cfg)
++    path.parent.mkdir(parents=True, exist_ok=True)
++    payload = {
++        "version": VERSION,
++        "claim_boundary": CLAIM_BOUNDARY,
++        "config": asdict(cfg),
++        "limitations": SAFETY_LIMITATIONS,
++    }
++    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
++
++
++def calibration_summary(empty_path: Path, safe_scan_paths: List[Path], cfg: DetectionConfig, false_alarm_rate: float = 0.01) -> Dict[str, Any]:
++    """
++    Estimate a conservative threshold from safe/known-non-alert scans.
++    This does not train a weapon classifier; it only sets a review threshold
++    from local negative examples.
++    """
++    validate_config(cfg)
++    if not safe_scan_paths:
++        raise CSIInputError("Calibration requires at least one --safe-scan file.")
++    if not 0.0 < float(false_alarm_rate) < 1.0:
++        raise CSIInputError("false_alarm_rate must be between 0 and 1.")
++    empty = load_csi_npz(empty_path)
++    scores: List[float] = []
++    qualities: List[float] = []
++    for scan_path in safe_scan_paths:
++        scan = load_csi_npz(scan_path)
++        res = detect(empty, scan, cfg)
++        scores.append(float(res.score))
++        qualities.append(float(res.features.get("sensor_quality", 0.0)))
++    q = 1.0 - float(false_alarm_rate)
++    empirical = float(np.quantile(np.asarray(scores, dtype=np.float64), q, method="higher" if len(scores) > 1 else "linear"))
++    # For very small safe sets, add a margin; with larger sets, the empirical quantile carries more weight.
++    margin = 0.04 if len(scores) < 20 else 0.02
++    recommended_threshold = float(np.clip(max(cfg.threshold, empirical + margin), 0.0, 0.995))
++    recommended_quality = float(np.clip(max(cfg.quality_threshold, np.quantile(np.asarray(qualities), 0.10) * 0.8), 0.0, 0.95))
++    return {
++        "version": VERSION,
++        "claim_boundary": CLAIM_BOUNDARY,
++        "calibration_type": "safe_scan_threshold_estimate",
++        "safe_scan_count": len(scores),
++        "false_alarm_rate_target": float(false_alarm_rate),
++        "score_min": float(np.min(scores)),
++        "score_median": float(np.median(scores)),
++        "score_max": float(np.max(scores)),
++        "quality_median": float(np.median(qualities)),
++        "recommended_threshold": recommended_threshold,
++        "recommended_quality_threshold": recommended_quality,
++        "limitations": SAFETY_LIMITATIONS,
++    }
++
++
++def write_calibration_json(path: Path, summary: Dict[str, Any]) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
++
++
+ def detect(empty: np.ndarray, scan: np.ndarray, cfg: DetectionConfig) -> DetectionResult:
++    validate_config(cfg)
+     features = extract_features(empty, scan, cfg)
+     score = score_features(features, cfg)
+ 
+@@ -1055,8 +1205,8 @@
+     score = score_features(features, cfg)
+     alert = bool(score >= cfg.threshold and features.sensor_quality >= cfg.quality_threshold)
+ 
+-    return DetectionResult(
+-        event="barrel_like_long_conductive_object_anomaly",
++    result = DetectionResult(
++        event="long_conductive_object_anomaly",
+         zone=cfg.zone,
+         timestamp_ms=int(time.time() * 1000),
+         score=score,
+@@ -1084,6 +1234,7 @@
+             ],
+         },
+     )
++    return annotate_result(result, cfg)
+ 
+ 
+ def detect_from_files(
+@@ -1113,9 +1264,21 @@
+         link_distance_m=link_distance_m,
+         sample_rate_hz=sample_rate_hz,
+     )
+-    empty = load_csi_npz(Path(empty_path))
+-    scan = load_csi_npz(Path(scan_path))
+-    return detect(empty, scan, cfg)
++    validate_config(cfg)
++    empty_path = Path(empty_path)
++    scan_path = Path(scan_path)
++    empty = load_csi_npz(empty_path)
++    scan = load_csi_npz(scan_path)
++    result = detect(empty, scan, cfg)
++    result.model["audit"] = {
++        "empty_path": str(empty_path),
++        "scan_path": str(scan_path),
++        "empty_sha256": sha256_file(empty_path),
++        "scan_sha256": sha256_file(scan_path),
++        "empty_shape": list(empty.shape),
++        "scan_shape": list(scan.shape),
++    }
++    return result
+ 
+ 
+ def write_json(path: Path, result: DetectionResult) -> None:
+@@ -1226,32 +1389,106 @@
+     return empty_path, scan_path
+ 
+ 
++
++def generate_demo_safe_pair(out_dir: Path, seed: int = 17) -> Tuple[Path, Path]:
++    """
++    Generates a known-safe synthetic pair for smoke tests and calibration demos.
++    The target scan has only small drift/noise, not a persistent elongated perturbation.
++    """
++    rng = np.random.default_rng(seed)
++    out_dir = Path(out_dir)
++    out_dir.mkdir(parents=True, exist_ok=True)
++
++    t, rx, tx, k = 96, 3, 2, 64
++    base_amp = 1.0 + 0.03 * rng.normal(size=(t, rx, tx, k))
++    base_phase = 0.05 * rng.normal(size=(t, rx, tx, k))
++    empty = base_amp * np.exp(1j * base_phase)
++
++    drift_amp = 0.006 * rng.normal(size=(t, rx, tx, k))
++    drift_phase = 0.006 * rng.normal(size=(t, rx, tx, k))
++    scan = (np.abs(empty) + drift_amp) * np.exp(1j * (np.angle(empty) + drift_phase))
++
++    empty_path = out_dir / "empty_bag_csi.npz"
++    safe_path = out_dir / "safe_bag_csi.npz"
++    np.savez_compressed(empty_path, csi=empty.astype(np.complex64))
++    np.savez_compressed(safe_path, csi=scan.astype(np.complex64))
++    return empty_path, safe_path
++
++
++def run_self_test(out_dir: Path) -> Dict[str, Any]:
++    out_dir = Path(out_dir)
++    pos_empty, pos_scan = generate_demo_pair(out_dir / "positive", seed=7)
++    safe_empty, safe_scan = generate_demo_safe_pair(out_dir / "safe", seed=17)
++
++    cfg = DetectionConfig()
++    positive = detect_from_files(pos_empty, pos_scan)
++    safe = detect_from_files(safe_empty, safe_scan)
++    passed = bool(
++        positive.score > safe.score
++        and positive.features.get("sensor_quality", 0.0) >= cfg.quality_threshold
++        and positive.model.get("decision") in {"human_review_anomaly", "secondary_review_optional"}
++        and safe.model.get("decision") in {"log_only", "secondary_review_optional", "rescan_low_quality"}
++    )
++    return {
++        "version": VERSION,
++        "passed": passed,
++        "claim_boundary": CLAIM_BOUNDARY,
++        "positive": {
++            "score": positive.score,
++            "alert": positive.alert,
++            "severity": positive.severity,
++            "decision": positive.model.get("decision"),
++            "sensor_quality": positive.features.get("sensor_quality"),
++        },
++        "safe": {
++            "score": safe.score,
++            "alert": safe.alert,
++            "severity": safe.severity,
++            "decision": safe.model.get("decision"),
++            "sensor_quality": safe.features.get("sensor_quality"),
++        },
++        "artifacts": {
++            "positive_empty": str(pos_empty),
++            "positive_scan": str(pos_scan),
++            "safe_empty": str(safe_empty),
++            "safe_scan": str(safe_scan),
++        },
++    }
++
++
+ def build_arg_parser() -> argparse.ArgumentParser:
+     p = argparse.ArgumentParser(
+         description=(
+-            "Advanced research detector for barrel-like long conductive-object "
+-            "anomalies inside bags using WiFi CSI. Does not confirm weapons."
++            "Advanced research detector for long conductive-object anomaly "
++            "patterns inside bags using WiFi CSI. Does not confirm weapons."
+         )
+     )
+     p.add_argument("--empty", type=Path, help="Path to empty/safe bag baseline .npz with key 'csi'.")
+     p.add_argument("--scan", type=Path, help="Path to target bag scan .npz with key 'csi'.")
+     p.add_argument("--zone", default="bag_scan", help="Zone or checkpoint label.")
+-    p.add_argument("--threshold", type=float, default=0.85, help="Alert threshold in [0, 1].")
+-    p.add_argument("--quality-threshold", type=float, default=0.35, help="Minimum sensor quality in [0, 1].")
+-    p.add_argument("--min-frames", type=int, default=8, help="Minimum frames required in each CSI file.")
+-    p.add_argument("--restricted-zone-prior", type=float, default=0.50, help="Context prior in [0,1].")
+-    p.add_argument("--bag-transition-prior", type=float, default=0.50, help="Context prior in [0,1].")
+-    p.add_argument("--carrier-hz", type=float, default=5.8e9, help="RF carrier frequency for wavelength/Doppler proxies.")
+-    p.add_argument("--bandwidth-hz", type=float, default=80e6, help="Bandwidth for range-resolution proxy.")
+-    p.add_argument("--link-distance-m", type=float, default=3.0, help="Link distance for Fresnel radius proxy.")
+-    p.add_argument("--sample-rate-hz", type=float, default=100.0, help="CSI frame/sample rate for Doppler proxy.")
++    p.add_argument("--threshold", type=float, default=None, help="Alert threshold in [0, 1].")
++    p.add_argument("--quality-threshold", type=float, default=None, help="Minimum sensor quality in [0, 1].")
++    p.add_argument("--min-frames", type=int, default=None, help="Minimum frames required in each CSI file.")
++    p.add_argument("--restricted-zone-prior", type=float, default=None, help="Context prior in [0,1].")
++    p.add_argument("--bag-transition-prior", type=float, default=None, help="Context prior in [0,1].")
++    p.add_argument("--carrier-hz", type=float, default=None, help="RF carrier frequency for wavelength/Doppler proxies.")
++    p.add_argument("--bandwidth-hz", type=float, default=None, help="Bandwidth for range-resolution proxy.")
++    p.add_argument("--link-distance-m", type=float, default=None, help="Link distance for Fresnel radius proxy.")
++    p.add_argument("--sample-rate-hz", type=float, default=None, help="CSI frame/sample rate for Doppler proxy.")
++    p.add_argument("--config-in", type=Path, default=None, help="Optional DetectionConfig JSON; CLI values override it.")
++    p.add_argument("--config-out", type=Path, default=None, help="Optional path to write the resolved DetectionConfig JSON.")
++    p.add_argument("--safe-scan", type=Path, action="append", default=[], help="Known-safe scan .npz for local threshold calibration. Repeatable.")
++    p.add_argument("--calibration-out", type=Path, default=None, help="Optional path to write safe-scan calibration JSON.")
++    p.add_argument("--false-alarm-rate", type=float, default=0.01, help="Target false-alarm rate for --safe-scan calibration.")
+     p.add_argument("--json-out", type=Path, default=None, help="Optional path to write alert JSON.")
+     p.add_argument("--csv-out", type=Path, default=None, help="Optional path to write features/contributions CSV.")
+     p.add_argument("--equations-out", type=Path, default=None, help="Optional path to write equation registry Markdown.")
+     p.add_argument("--concept-report", type=Path, default=None, help="Optional path to write full concept report Markdown.")
+     p.add_argument("--pretty", action="store_true", help="Pretty-print JSON to stdout.")
+-    p.add_argument("--make-demo", action="store_true", help="Generate synthetic demo CSI files and exit.")
+-    p.add_argument("--demo-dir", type=Path, default=Path("demo_csi"), help="Directory for --make-demo files.")
++    p.add_argument("--make-demo", action="store_true", help="Generate synthetic positive demo CSI files and exit.")
++    p.add_argument("--make-demo-safe", action="store_true", help="Generate synthetic known-safe demo CSI files and exit.")
++    p.add_argument("--self-test", action="store_true", help="Run a synthetic smoke test and exit.")
++    p.add_argument("--demo-dir", type=Path, default=Path("demo_csi"), help="Directory for demo/self-test files.")
+     p.add_argument("--demo-seed", type=int, default=7, help="Random seed for --make-demo.")
+     return p
+ 
+@@ -1260,9 +1497,37 @@
+     args = build_arg_parser().parse_args(argv)
+ 
+     try:
++        cfg = config_from_json(args.config_in) if args.config_in is not None else DetectionConfig()
++        override_map = {
++            "threshold": args.threshold,
++            "quality_threshold": args.quality_threshold,
++            "min_frames": args.min_frames,
++            "restricted_zone_prior": args.restricted_zone_prior,
++            "bag_transition_prior": args.bag_transition_prior,
++            "carrier_hz": args.carrier_hz,
++            "bandwidth_hz": args.bandwidth_hz,
++            "link_distance_m": args.link_distance_m,
++            "sample_rate_hz": args.sample_rate_hz,
++            "zone": args.zone,
++        }
++        cfg_data = asdict(cfg)
++        for key, value in override_map.items():
++            if value is not None:
++                cfg_data[key] = value
++        cfg = DetectionConfig(**cfg_data)
++        validate_config(cfg)
++
+         if args.equations_out is not None:
+             write_equations_markdown(args.equations_out)
+ 
++        if args.config_out is not None:
++            write_config_json(args.config_out, cfg)
++
++        if args.self_test:
++            result = run_self_test(args.demo_dir)
++            print(json.dumps(result, indent=2))
++            return 0 if result.get("passed") else 3
++
+         if args.make_demo:
+             empty_path, scan_path = generate_demo_pair(args.demo_dir, seed=args.demo_seed)
+             print(json.dumps({
+@@ -1275,25 +1540,51 @@
+             }, indent=2))
+             return 0
+ 
++        if args.make_demo_safe:
++            empty_path, safe_path = generate_demo_safe_pair(args.demo_dir, seed=args.demo_seed)
++            print(json.dumps({
++                "created": {
++                    "empty": str(empty_path),
++                    "safe_scan": str(safe_path),
++                },
++                "calibrate": f"python main.py --empty {empty_path} --safe-scan {safe_path} --calibration-out calibration.json --pretty",
++                "claim_boundary": CLAIM_BOUNDARY,
++            }, indent=2))
++            return 0
++
++        if args.safe_scan or args.calibration_out is not None:
++            if args.empty is None:
++                raise CSIInputError("Calibration requires --empty plus one or more --safe-scan files.")
++            summary = calibration_summary(args.empty, list(args.safe_scan), cfg, false_alarm_rate=float(args.false_alarm_rate))
++            if args.calibration_out is not None:
++                write_calibration_json(args.calibration_out, summary)
++            print(json.dumps(summary, indent=2 if args.pretty else None))
++            if args.scan is None:
++                return 0
++
+         if args.empty is None or args.scan is None:
+-            if args.equations_out is not None:
+-                print(json.dumps({"equations_out": str(args.equations_out), "claim_boundary": CLAIM_BOUNDARY}, indent=2))
++            if args.equations_out is not None or args.config_out is not None:
++                print(json.dumps({
++                    "equations_out": str(args.equations_out) if args.equations_out else None,
++                    "config_out": str(args.config_out) if args.config_out else None,
++                    "claim_boundary": CLAIM_BOUNDARY,
++                }, indent=2))
+                 return 0
+-            raise CSIInputError("Provide --empty and --scan, or use --make-demo.")
++            raise CSIInputError("Provide --empty and --scan, use --make-demo, or run calibration with --safe-scan.")
+ 
+         result = detect_from_files(
+             args.empty,
+             args.scan,
+-            zone=str(args.zone),
+-            threshold=float(args.threshold),
+-            quality_threshold=float(args.quality_threshold),
+-            min_frames=int(args.min_frames),
+-            restricted_zone_prior=float(args.restricted_zone_prior),
+-            bag_transition_prior=float(args.bag_transition_prior),
+-            carrier_hz=float(args.carrier_hz),
+-            bandwidth_hz=float(args.bandwidth_hz),
+-            link_distance_m=float(args.link_distance_m),
+-            sample_rate_hz=float(args.sample_rate_hz),
++            zone=str(cfg.zone),
++            threshold=float(cfg.threshold),
++            quality_threshold=float(cfg.quality_threshold),
++            min_frames=int(cfg.min_frames),
++            restricted_zone_prior=float(cfg.restricted_zone_prior),
++            bag_transition_prior=float(cfg.bag_transition_prior),
++            carrier_hz=float(cfg.carrier_hz),
++            bandwidth_hz=float(cfg.bandwidth_hz),
++            link_distance_m=float(cfg.link_distance_m),
++            sample_rate_hz=float(cfg.sample_rate_hz),
+         )
+ 
+         if args.json_out is not None:

@@ -1,0 +1,548 @@
+{
+  "event": "long_conductive_object_anomaly",
+  "zone": "bag_scan",
+  "timestamp_ms": 1777220498582,
+  "score": 0.9591074849680484,
+  "threshold": 0.85,
+  "alert": true,
+  "severity": "high_human_review",
+  "claim_boundary": "Possible long conductive-object anomaly in bag; not weapon confirmation and not intent detection.",
+  "features": {
+    "wavelength_m": 0.05168835482758621,
+    "skin_depth_proxy_m": 2.089806784938892e-06,
+    "reflection_score_proxy": 0.9996408049969338,
+    "baseline_norm_delta": 0.18548794090747833,
+    "amplitude_residual_mean_z": 20.0,
+    "phase_residual_mean_z": -3.787178420474553e-10,
+    "amplitude_ratio_anomaly": 7.170494825546356,
+    "phase_difference_anomaly": 0.25152488184705823,
+    "smoothed_energy_z": 20.0,
+    "energy_z": 20.0,
+    "spectral_ripple_z": 20.0,
+    "phase_distortion_z": 20.0,
+    "amplitude_distortion_z": 20.0,
+    "phase_curvature_z": 0.13189254584292437,
+    "group_delay_z": 0.5577882012712826,
+    "stft_peak_ratio": 0.33554785368256707,
+    "doppler_phase_rate_z": 3.742311179018073e-10,
+    "radial_velocity_proxy_m_s": 1.1232545384111658e-18,
+    "autocorr_lag1": 0.7067210366674348,
+    "cross_stream_coherence": 0.9770001769065857,
+    "coherence_rank": 0.18336584053378147,
+    "spatial_covariance_score": 0.3255083246160409,
+    "beamforming_concentration_proxy": 0.13781140791958038,
+    "music_sharpness_proxy": 0.1476823091506958,
+    "delay_profile_peakiness": 0.3847995102405548,
+    "range_resolution_m": 1.8737028625,
+    "fresnel_radius_m": 0.1968915085032609,
+    "tomographic_projection_proxy": 0.8065723180770874,
+    "sparse_reconstruction_proxy": 1.0,
+    "anomaly_map_proxy": 0.008036543615162373,
+    "elongation_proxy": 253.29402881719508,
+    "orientation_proxy_rad": -0.0031726782238198988,
+    "orientation_stability": 0.9991301055478686,
+    "extent_proxy": 0.984617910770748,
+    "rigidity_proxy": 0.9499418903142214,
+    "persistence": 1.0,
+    "conductive_score_proxy": 0.9922740815921012,
+    "spectral_entropy_delta": 0.30532097438413697,
+    "spectral_flatness_delta": 0.2927832209656016,
+    "residual_kurtosis_z": -2.9264314773242996,
+    "mahalanobis_proxy": 5.0,
+    "posterior_normal": 0.0067551695137230494,
+    "posterior_long_conductive": 0.8298554062802258,
+    "posterior_unknown": 0.16338942420522126,
+    "sensor_quality": 0.981044318699098,
+    "restricted_zone_prior": 0.5,
+    "bag_transition_prior": 0.5
+  },
+  "contributions": {
+    "energy_z": 10.4,
+    "spectral_ripple_z": 10.8,
+    "phase_distortion_z": 5.2,
+    "amplitude_distortion_z": 4.8,
+    "phase_curvature_z": 0.0422056146697358,
+    "group_delay_z": 0.12271340427968216,
+    "amplitude_residual_mean_z": 5.6000000000000005,
+    "phase_residual_mean_z": -9.467946051186382e-11,
+    "amplitude_ratio_anomaly": 1.8643286546420528,
+    "phase_difference_anomaly": 0.06539646928023514,
+    "stft_peak_ratio": 0.05368765658921073,
+    "doppler_phase_rate_z": 6.736160122232531e-11,
+    "autocorr_lag1": 0.08480652440009218,
+    "cross_stream_coherence": 0.33218006014823914,
+    "coherence_rank": 0.040340484917431925,
+    "spatial_covariance_score": 0.05859149843088736,
+    "beamforming_concentration_proxy": 0.024806053425524468,
+    "music_sharpness_proxy": 0.023629169464111328,
+    "delay_profile_peakiness": 0.07695990204811097,
+    "elongation_proxy_log": 1.661547357387592,
+    "orientation_stability": 0.17984341899861633,
+    "extent_proxy": 0.15753886572331968,
+    "rigidity_proxy": 0.2849825670942664,
+    "persistence": 0.36,
+    "conductive_score_proxy": 0.3175277061094724,
+    "spectral_entropy_drop": 0.054957775389144654,
+    "spectral_flatness_drop": 0.05855664419312032,
+    "mahalanobis_proxy": 1.3,
+    "sensor_quality": 0.23545063648778353,
+    "restricted_zone_prior": 0.13,
+    "bag_transition_prior": 0.1,
+    "bias": -4.4
+  },
+  "equation_coverage": [
+    {
+      "id": "E01",
+      "group": "Signal and channel model",
+      "name": "Received OFDM subcarrier model",
+      "latex": "y_k(t)=H_k(t)x_k(t)+n_k(t)",
+      "implemented_as": "input CSI model"
+    },
+    {
+      "id": "E02",
+      "group": "Signal and channel model",
+      "name": "Multipath CSI response",
+      "latex": "H_k(t)=\\sum_{p=1}^{P} a_p(t)e^{-j2\\pi f_k\\tau_p(t)}",
+      "implemented_as": "residual/multipath interpretation"
+    },
+    {
+      "id": "E03",
+      "group": "Signal and channel model",
+      "name": "CSI amplitude",
+      "latex": "A_k(t)=|H_k(t)|",
+      "implemented_as": "amplitude_distortion, amplitude_ratio"
+    },
+    {
+      "id": "E04",
+      "group": "Signal and channel model",
+      "name": "CSI phase",
+      "latex": "\\phi_k(t)=\\arg(H_k(t))",
+      "implemented_as": "phase_sanitize, phase_distortion"
+    },
+    {
+      "id": "E05",
+      "group": "Signal and channel model",
+      "name": "Wavelength",
+      "latex": "\\lambda=\\frac{c}{f}",
+      "implemented_as": "wavelength_m"
+    },
+    {
+      "id": "E06",
+      "group": "Signal and channel model",
+      "name": "Path phase shift",
+      "latex": "\\Delta \\phi_k=-2\\pi f_k\\Delta\\tau",
+      "implemented_as": "phase residual features"
+    },
+    {
+      "id": "E07",
+      "group": "Signal and channel model",
+      "name": "Propagation delay",
+      "latex": "\\tau_p=\\frac{d_p}{c}",
+      "implemented_as": "delay profile interpretation"
+    },
+    {
+      "id": "E08",
+      "group": "Signal and channel model",
+      "name": "Complex permittivity",
+      "latex": "\\epsilon^*=\\epsilon'-j\\epsilon''",
+      "implemented_as": "conductive prior metadata"
+    },
+    {
+      "id": "E09",
+      "group": "Signal and channel model",
+      "name": "Skin depth",
+      "latex": "\\delta=\\sqrt{\\frac{2}{\\omega\\mu\\sigma}}",
+      "implemented_as": "skin_depth_proxy"
+    },
+    {
+      "id": "E10",
+      "group": "Signal and channel model",
+      "name": "Reflection coefficient",
+      "latex": "\\Gamma=\\frac{Z_2-Z_1}{Z_2+Z_1}",
+      "implemented_as": "reflection_score_proxy"
+    },
+    {
+      "id": "E11",
+      "group": "CSI preprocessing",
+      "name": "Baseline-normalized CSI",
+      "latex": "\\tilde{H}_k(t)=\\frac{H_k(t)}{H_{k,0}}",
+      "implemented_as": "baseline_normalized_csi"
+    },
+    {
+      "id": "E12",
+      "group": "CSI preprocessing",
+      "name": "CSI perturbation",
+      "latex": "\\Delta H_k(t)=H_k(t)-H_{k,0}",
+      "implemented_as": "baseline_residual"
+    },
+    {
+      "id": "E13",
+      "group": "CSI preprocessing",
+      "name": "Amplitude residual",
+      "latex": "\\Delta A_k(t)=|H_k(t)|-|H_{k,0}|",
+      "implemented_as": "amplitude_residual_mean_z"
+    },
+    {
+      "id": "E14",
+      "group": "CSI preprocessing",
+      "name": "Phase residual",
+      "latex": "\\Delta \\phi_k(t)=\\operatorname{unwrap}(\\phi_k(t))-\\operatorname{unwrap}(\\phi_{k,0})",
+      "implemented_as": "phase_residual_mean_z"
+    },
+    {
+      "id": "E15",
+      "group": "CSI preprocessing",
+      "name": "Antenna amplitude ratio",
+      "latex": "R^A_{i,j,k}(t)=\\frac{|H_{i,k}(t)|}{|H_{j,k}(t)|+\\epsilon}",
+      "implemented_as": "amplitude_ratio_anomaly"
+    },
+    {
+      "id": "E16",
+      "group": "CSI preprocessing",
+      "name": "Antenna phase difference",
+      "latex": "R^\\phi_{i,j,k}(t)=\\angle H_{i,k}(t)-\\angle H_{j,k}(t)",
+      "implemented_as": "phase_difference_anomaly"
+    },
+    {
+      "id": "E17",
+      "group": "CSI preprocessing",
+      "name": "Phase sanitization",
+      "latex": "\\phi'_k(t)=\\phi_k(t)-(\\alpha f_k+\\beta)",
+      "implemented_as": "phase_sanitize"
+    },
+    {
+      "id": "E18",
+      "group": "CSI preprocessing",
+      "name": "MAD filter",
+      "latex": "z_k(t)=\\frac{A_k(t)-\\operatorname{median}(A_k)}{\\operatorname{MAD}(A_k)}",
+      "implemented_as": "robust_z"
+    },
+    {
+      "id": "E19",
+      "group": "CSI preprocessing",
+      "name": "Smoothed CSI",
+      "latex": "\\bar{H}_k(t)=\\frac{1}{W}\\sum_{u=t-W+1}^{t}H_k(u)",
+      "implemented_as": "moving_average_csi"
+    },
+    {
+      "id": "E20",
+      "group": "CSI preprocessing",
+      "name": "Kalman update",
+      "latex": "\\hat{x}_{t|t}=\\hat{x}_{t|t-1}+K_t(z_t-\\hat{x}_{t|t-1})",
+      "implemented_as": "kalman_smooth_1d"
+    },
+    {
+      "id": "E21",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "STFT",
+      "latex": "S_k(t,\\omega)=\\sum_{\\tau}H_k(\\tau)w(\\tau-t)e^{-j\\omega\\tau}",
+      "implemented_as": "stft_peak_ratio"
+    },
+    {
+      "id": "E22",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Doppler estimate",
+      "latex": "f_D=\\frac{1}{2\\pi}\\frac{d\\phi(t)}{dt}",
+      "implemented_as": "doppler_phase_rate_z"
+    },
+    {
+      "id": "E23",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Radial velocity estimate",
+      "latex": "v_r=\\frac{\\lambda f_D}{2}",
+      "implemented_as": "radial_velocity_proxy"
+    },
+    {
+      "id": "E24",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Temporal energy",
+      "latex": "E(t)=\\sum_k|\\Delta H_k(t)|^2",
+      "implemented_as": "energy_z"
+    },
+    {
+      "id": "E25",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Motion-normalized residual",
+      "latex": "M_k(t)=\\frac{\\Delta H_k(t)}{\\sqrt{\\sum_u|\\Delta H_k(u)|^2+\\epsilon}}",
+      "implemented_as": "motion_normalized_residual"
+    },
+    {
+      "id": "E26",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Static-object persistence",
+      "latex": "P_s=\\frac{1}{T}\\sum_{t=1}^{T}\\mathbb{1}(|\\Delta H(t)|>\\eta)",
+      "implemented_as": "persistence"
+    },
+    {
+      "id": "E27",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Static/dynamic separation",
+      "latex": "H_k(t)=H^{static}_k+H^{dynamic}_k(t)+n_k(t)",
+      "implemented_as": "baseline_residual"
+    },
+    {
+      "id": "E28",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Background-subtracted dynamic component",
+      "latex": "H^{dynamic}_k(t)=H_k(t)-\\frac{1}{T_0}\\sum_{u=1}^{T_0}H_k(u)",
+      "implemented_as": "dynamic_component"
+    },
+    {
+      "id": "E29",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Temporal autocorrelation",
+      "latex": "\\rho(\\ell)=\\frac{\\sum_t x(t)x(t-\\ell)}{\\sum_t x(t)^2}",
+      "implemented_as": "autocorr_lag1"
+    },
+    {
+      "id": "E30",
+      "group": "Motion, Doppler, and temporal structure",
+      "name": "Cross-link coherence",
+      "latex": "C_{m,n}=\\frac{|\\sum_t \\Delta H_m(t)\\Delta H_n^*(t)|}{\\sqrt{\\sum_t|\\Delta H_m(t)|^2\\sum_t|\\Delta H_n(t)|^2}}",
+      "implemented_as": "cross_stream_coherence"
+    },
+    {
+      "id": "E31",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "MIMO CSI matrix",
+      "latex": "\\mathbf{H}_k(t)\\in \\mathbb{C}^{N_r\\times N_t}",
+      "implemented_as": "shape-aware CSI features"
+    },
+    {
+      "id": "E32",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "Spatial covariance",
+      "latex": "\\mathbf{R}_k=\\mathbb{E}[\\mathbf{h}_k\\mathbf{h}_k^{H}]",
+      "implemented_as": "spatial_covariance_score"
+    },
+    {
+      "id": "E33",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "Beamforming response",
+      "latex": "B(\\theta)=\\mathbf{a}^{H}(\\theta)\\mathbf{R}\\mathbf{a}(\\theta)",
+      "implemented_as": "beamforming_concentration_proxy"
+    },
+    {
+      "id": "E34",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "MUSIC spectrum",
+      "latex": "P_{\\text{MUSIC}}(\\theta)=\\frac{1}{\\mathbf{a}^{H}(\\theta)\\mathbf{E}_n\\mathbf{E}_n^{H}\\mathbf{a}(\\theta)}",
+      "implemented_as": "music_sharpness_proxy"
+    },
+    {
+      "id": "E35",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "Delay profile",
+      "latex": "P(\\tau)=\\left|\\sum_k H_k e^{j2\\pi f_k\\tau}\\right|^2",
+      "implemented_as": "delay_profile_peakiness"
+    },
+    {
+      "id": "E36",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "Range resolution limit",
+      "latex": "\\Delta r=\\frac{c}{2B}",
+      "implemented_as": "range_resolution_m"
+    },
+    {
+      "id": "E37",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "Fresnel-zone radius",
+      "latex": "r_F=\\sqrt{\\frac{\\lambda d_1d_2}{d_1+d_2}}",
+      "implemented_as": "fresnel_radius_m"
+    },
+    {
+      "id": "E38",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "Tomographic projection",
+      "latex": "\\mathbf{y}=\\mathbf{A}\\mathbf{x}+\\mathbf{n}",
+      "implemented_as": "tomographic_projection_proxy"
+    },
+    {
+      "id": "E39",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "Regularized reconstruction",
+      "latex": "\\hat{\\mathbf{x}}=\\arg\\min_{\\mathbf{x}}\\|\\mathbf{y}-\\mathbf{A}\\mathbf{x}\\|_2^2+\\lambda\\|\\mathbf{x}\\|_1",
+      "implemented_as": "sparse_reconstruction_proxy"
+    },
+    {
+      "id": "E40",
+      "group": "Spatial sensing and imaging abstractions",
+      "name": "Spatial anomaly map",
+      "latex": "\\mathcal{A}(x,y)=|\\hat{x}(x,y)-\\hat{x}_0(x,y)|",
+      "implemented_as": "anomaly_map_proxy"
+    },
+    {
+      "id": "E41",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Metalness vector",
+      "latex": "\\mathbf{m}=[\\Delta A,\\Delta\\phi,\\sigma_A^2,\\sigma_\\phi^2,C_{m,n},P_s]",
+      "implemented_as": "conductive_score_proxy"
+    },
+    {
+      "id": "E42",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Inter-subcarrier variance",
+      "latex": "\\sigma^2(t)=\\frac{1}{K-1}\\sum_{k=1}^{K}(A_k(t)-\\bar{A}(t))^2",
+      "implemented_as": "spectral_ripple_z"
+    },
+    {
+      "id": "E43",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Phase curvature",
+      "latex": "\\kappa_\\phi=\\frac{\\partial^2 \\phi(f)}{\\partial f^2}",
+      "implemented_as": "phase_curvature_z"
+    },
+    {
+      "id": "E44",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Conductive reflection score",
+      "latex": "S_c=w_1|\\Gamma|+w_2\\sigma_A^2+w_3\\sigma_\\phi^2",
+      "implemented_as": "conductive_score_proxy"
+    },
+    {
+      "id": "E45",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Elongation from blob eigenvalues",
+      "latex": "E_{\\text{long}}=\\frac{\\lambda_{\\max}(\\Sigma_{\\text{blob}})}{\\lambda_{\\min}(\\Sigma_{\\text{blob}})+\\epsilon}",
+      "implemented_as": "elongation_proxy"
+    },
+    {
+      "id": "E46",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Object orientation estimate",
+      "latex": "\\theta_{\\text{obj}}=\\frac{1}{2}\\tan^{-1}\\left(\\frac{2\\Sigma_{xy}}{\\Sigma_{xx}-\\Sigma_{yy}}\\right)",
+      "implemented_as": "orientation_proxy_rad"
+    },
+    {
+      "id": "E47",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Approximate object extent",
+      "latex": "L_{\\text{est}}=\\max_{i,j}\\|p_i-p_j\\|_2",
+      "implemented_as": "extent_proxy"
+    },
+    {
+      "id": "E48",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Bag/clutter compensation residual",
+      "latex": "\\Delta H^{obj}=H^{bag+obj}-H^{bag}",
+      "implemented_as": "bag residual"
+    },
+    {
+      "id": "E49",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Class posterior",
+      "latex": "P(c|\\mathbf{z})=\\frac{e^{g_c(\\mathbf{z})}}{\\sum_{c'}e^{g_{c'}(\\mathbf{z})}}",
+      "implemented_as": "softmax_posteriors"
+    },
+    {
+      "id": "E50",
+      "group": "Metalness, elongation, and object-class features",
+      "name": "Human-review alert score",
+      "latex": "S_{\\text{alert}}=P(c=\\text{elongated conductive object}|\\mathbf{z})P(\\text{restricted zone})C_{\\text{sensor}}",
+      "implemented_as": "score_features"
+    }
+  ],
+  "model": {
+    "name": "wifi_csi_long_conductive_object_advanced_research_head",
+    "version": "0.4.0",
+    "input": "empty/safe-bag CSI baseline vs target-bag CSI scan",
+    "human_review_required": true,
+    "output_boundary": "anomaly score only; not weapon confirmation",
+    "implemented_equations": 50,
+    "feature_groups": [
+      "signal_channel",
+      "preprocessing",
+      "motion_doppler_temporal",
+      "spatial_imaging_abstractions",
+      "metalness_elongation_object_class",
+      "context_governance"
+    ],
+    "schema_version": "0.4",
+    "decision": "human_review_anomaly",
+    "limitations": [
+      "Research/replay-mode anomaly scoring only; not weapon, rifle, identity, or intent detection.",
+      "Do not use as the sole basis for enforcement, search, detention, or other adverse action.",
+      "Requires local calibration with representative safe bags, device placement, venue layout, and RF environment.",
+      "Scores can shift with multipath, wet objects, dense electronics, body motion, antenna placement, and firmware changes."
+    ],
+    "top_contributions": [
+      {
+        "name": "spectral_ripple_z",
+        "value": 10.8
+      },
+      {
+        "name": "energy_z",
+        "value": 10.4
+      },
+      {
+        "name": "amplitude_residual_mean_z",
+        "value": 5.6000000000000005
+      },
+      {
+        "name": "phase_distortion_z",
+        "value": 5.2
+      },
+      {
+        "name": "amplitude_distortion_z",
+        "value": 4.8
+      },
+      {
+        "name": "bias",
+        "value": -4.4
+      },
+      {
+        "name": "amplitude_ratio_anomaly",
+        "value": 1.8643286546420528
+      },
+      {
+        "name": "elongation_proxy_log",
+        "value": 1.661547357387592
+      },
+      {
+        "name": "mahalanobis_proxy",
+        "value": 1.3
+      },
+      {
+        "name": "persistence",
+        "value": 0.36
+      },
+      {
+        "name": "cross_stream_coherence",
+        "value": 0.33218006014823914
+      },
+      {
+        "name": "conductive_score_proxy",
+        "value": 0.3175277061094724
+      }
+    ],
+    "config": {
+      "threshold": 0.85,
+      "quality_threshold": 0.35,
+      "min_frames": 8,
+      "carrier_hz": 5800000000.0,
+      "bandwidth_hz": 80000000.0,
+      "link_distance_m": 3.0,
+      "sample_rate_hz": 100.0,
+      "restricted_zone_prior": 0.5,
+      "bag_transition_prior": 0.5
+    },
+    "audit": {
+      "empty_path": "/mnt/data/v04_demo/positive/empty_bag_csi.npz",
+      "scan_path": "/mnt/data/v04_demo/positive/target_bag_csi.npz",
+      "empty_sha256": "865185994392fd04f38a6e6add53d4c513e6b4c533c762c557c6630b6f181e05",
+      "scan_sha256": "925e1ca568bd1c70ea661a778471fcb984759f0a37ad4d2cfbde53ba1ca1296c",
+      "empty_shape": [
+        96,
+        3,
+        2,
+        64
+      ],
+      "scan_shape": [
+        96,
+        3,
+        2,
+        64
+      ]
+    }
+  }
+}
